@@ -1,4 +1,5 @@
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Literal, Union
 
@@ -16,9 +17,7 @@ class EmbeddingObject(BaseModel):
 class EmbeddingSuccessResponse(BaseModel):
     object: Literal["list"]
     data: List[EmbeddingObject]
-    model: Literal[
-        "text-embedding-3-large", "text-embedding-3-small", "text-embedding-ada-002"
-    ]
+    model: str
     usage: Dict[str, int]
 
 
@@ -36,6 +35,15 @@ class EmbeddingErrorResponse(BaseModel):
 class OpenAIEmbeddingError(Exception):
     def __init__(self, message: str, error_type: str) -> None:
         self.message = f"OpenAI Embedding failed, with error type {error_type}, error message: *[{message}]*"
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class MiniMaxEmbeddingError(Exception):
+    def __init__(self, message: str, error_type: str) -> None:
+        self.message = f"MiniMax Embedding failed, with error type {error_type}, error message: *[{message}]*"
         super().__init__(self.message)
 
     def __str__(self) -> str:
@@ -106,3 +114,84 @@ class OpenAIEmbedding(EmbeddingModel):
             # ensure the order and return
             embeddings = sorted(results.data, key=lambda x: x.index)  # type: ignore
             return [i.embedding for i in embeddings]
+
+
+class MiniMaxEmbedding(EmbeddingModel):
+    def __init__(self, emb_config: Dict) -> None:
+        self.config = emb_config
+        logger.trace(f"EMB-Initializing MiniMaxEmbedding with config: {self.config}")
+        # auth - MiniMax requires Bearer prefix for embedding API
+        api_key_env = emb_config.get("api_key_env", "MINIMAX_EMB_API_KEY")
+        try:
+            api_key = os.environ[api_key_env]
+        except KeyError as e:
+            logger.error(f"Can not find {api_key_env} environment variable")
+            raise ValueError(f"Can not find {api_key_env} environment variable") from e
+        self.header = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+    def __call__(self, texts: Union[List[str], str]) -> List[List[float]]:
+        if isinstance(texts, str):
+            texts = [texts]
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                return self._call_embedding(texts)
+            except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.TimeoutException) as e:
+                if attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    logger.warning(
+                        f"EMB-MiniMaxEmbedding connection error (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {wait}s..."
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error(
+                        f"EMB-MiniMaxEmbedding failed after {max_retries} attempts: {e}"
+                    )
+                    raise MiniMaxEmbeddingError(
+                        message=str(e),
+                        error_type="connection_error",
+                    ) from e
+
+    def _call_embedding(self, texts: List[str]) -> List[List[float]]:
+        with httpx.Client(timeout=self.config["embedding_timeout"]) as client:
+            logger.trace(
+                f"EMB-Calling MiniMaxEmbedding with model: {self.config['emb_model_name']}, endpoint: {self.config['request_endpoint']}"
+            )
+            request_data = {
+                "texts": texts,
+                "model": self.config["emb_model_name"],
+                "type": "db",
+            }
+
+            response = client.post(
+                url=self.config["request_endpoint"],
+                headers=self.header,
+                json=request_data,
+            )
+
+            try:
+                result = response.json()
+                logger.trace("EMB-MiniMaxEmbedding response received")
+            except Exception as e:
+                logger.error(f"EMB-MiniMaxEmbedding failed to parse JSON response: {e}")
+                raise MiniMaxEmbeddingError(
+                    message=str(e),
+                    error_type="json_parse_error",
+                ) from e
+
+            if result.get("base_resp", {}).get("status_code", 0) != 0:
+                err_msg = result.get("base_resp", {}).get("status_msg", "Unknown error")
+                logger.error(f"EMB-MiniMaxEmbedding API error: {err_msg}")
+                raise MiniMaxEmbeddingError(message=err_msg, error_type="api_error")
+
+            vectors = result.get("vectors", [])
+            if not vectors:
+                logger.error("EMB-MiniMaxEmbedding returned no vectors")
+                raise MiniMaxEmbeddingError(message="No vectors returned", error_type="empty_response")
+
+            return vectors

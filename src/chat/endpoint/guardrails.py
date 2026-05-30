@@ -137,8 +137,9 @@ class ClaudeGuardRailStructureGeneration(BaseGuardRailStructureGeneration):
 class GPTGuardRailStructureGeneration(BaseGuardRailStructureGeneration):
     def __init__(self, chat_config: Dict[str, Any]) -> None:
         super().__init__(chat_config)
+        api_key_env = chat_config.get("api_key_env", "OPENAI_API_KEY")
         self.headers = {
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+            "Authorization": f"Bearer {os.environ[api_key_env]}",
             "Content-Type": "application/json",
         }
 

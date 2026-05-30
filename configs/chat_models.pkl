@@ -4,12 +4,13 @@ class ChatModelConfig {
     lora_path: String| Null = null
     lora_base_model: String|Null = null
     chat_model_type: Null|String(this is "completion"|"instruction"|"chat")
-    chat_model_inference_engine: String(this is "vllm"|"openai"|"anthropic")
+    chat_model_inference_engine: String(this is "vllm"|"openai"|"anthropic"|"openai-compatible")
     chat_system_message: Null|String = null
     chat_endpoint: Null|String
     chat_template_path: Null|String
     chat_parameters: Mapping
     chat_request_sleep: Mapping|Null = null
+    api_key_env: String = "OPENAI_API_KEY"
 }
 
 // close source
@@ -84,6 +85,19 @@ claude_haiku_3: ChatModelConfig = new {
         ["sleep_time"] = 60
         ["sleep_every_count"] = 5
     }
+}
+// minimax
+minimax_m2: ChatModelConfig = new {
+    chat_model = "MiniMax-M2.7"
+    chat_model_type = "chat"
+    chat_model_inference_engine = "openai-compatible"
+    chat_endpoint = "https://api.minimaxi.com/v1/chat/completions"
+    chat_template_path = null
+    chat_system_message = "You are a helpful assistant."
+    chat_parameters = new Mapping {
+        ["max_tokens"] = 4096
+    }
+    api_key_env = "MINIMAX_API_KEY"
 }
 // open source
 //small
@@ -199,6 +213,8 @@ chat_model_dict = new Mapping {
     ["claude-sonnet-35"] = claude_sonnet_35
     ["claude-opus-3"] = claude_opus_3
     ["claude-haiku-3"] = claude_haiku_3
+    // minimax
+    ["minimax-m2"] = minimax_m2
     // open source
     // small
     ["llama-3.1-8b-instruct"] = llama3_1_instruct_8b

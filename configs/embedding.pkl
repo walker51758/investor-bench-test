@@ -2,6 +2,8 @@ class EmbEndpointConfig {
   emb_model_name: String
   request_endpoint: String
   emb_size: Int(this > 0)
+  emb_inference_engine: String(this is "openai"|"minimax") = "openai"
+  api_key_env: String = "OPENAI_API_KEY"
 }
 
 text_embedding_3_large: EmbEndpointConfig = new {
@@ -22,8 +24,17 @@ text_embedding_ada_002: EmbEndpointConfig = new {
   emb_size = 1536
 }
 
+minimax_embo_01: EmbEndpointConfig = new {
+  emb_model_name = "embo-01"
+  request_endpoint = "https://api.minimaxi.com/v1/embeddings"
+  emb_size = 1536
+  emb_inference_engine = "minimax"
+  api_key_env = "MINIMAX_EMB_API_KEY"
+}
+
 embedding_models = new Mapping {
   ["text-embedding-3-large"] = text_embedding_3_large
-  ["text-embedding-3-small"] = text-embedding-3-small
+  ["text-embedding-3-small"] = text_embedding_3_small
   ["text-embedding-ada-002"] = text_embedding_ada_002
+  ["minimax-embo-01"] = minimax_embo_01
 }

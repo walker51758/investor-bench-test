@@ -11,8 +11,7 @@ from .endpoint import (
     MultiAssetsStructureGenerationFailure,
     SingleAssetStructureOutputResponse,
     MultiAssetsStructureOutputResponse,
-    GPTGuardRailStructureGeneration,
-    ClaudeGuardRailStructureGeneration,
+    SingleAssetOpenAICompatibleStructureGeneration,
 )
 
 from .prompt import (
@@ -20,7 +19,6 @@ from .prompt import (
     MultiAssetBasePromptConstructor,
     SingleAssetVLLMPromptConstructor,
     MultiAssetsVLLMPromptConstructor,
-    GuardrailPromptConstructor,
 )
 
 from .structure_generation import (
@@ -28,7 +26,6 @@ from .structure_generation import (
     MultiAssetsBaseStructureGenerationSchema,
     SingleAssetVLLMStructureGenerationSchema,
     MultiAssetsVLLMStructureGenerationSchema,
-    GuardrailStructureGenerationSchema,
 )
 
 from ..utils import TaskType
@@ -64,24 +61,16 @@ def get_chat_model(
                 MultiAssetsVLLMStructureGeneration(chat_config=chat_config),
                 MultiAssetsVLLMPromptConstructor(),
             )
-    elif chat_config["chat_model_inference_engine"] == "openai":
+    elif chat_config["chat_model_inference_engine"] == "openai-compatible":
+        logger.trace("SYS-Chat model is OpenAI-Compatible")
         if task_type == TaskType.SingleAsset:
             return (
-                GuardrailStructureGenerationSchema(),
-                GPTGuardRailStructureGeneration(chat_config=chat_config),
-                GuardrailPromptConstructor(),
+                SingleAssetVLLMStructureGenerationSchema(),
+                SingleAssetOpenAICompatibleStructureGeneration(chat_config=chat_config),
+                SingleAssetVLLMPromptConstructor(),
             )
         else:
-            raise NotImplementedError("Multi-asset not implemented for OpenAI")
-    elif chat_config["chat_model_inference_engine"] == "anthropic":
-        if task_type == TaskType.SingleAsset:
-            return (
-                GuardrailStructureGenerationSchema(),
-                ClaudeGuardRailStructureGeneration(chat_config=chat_config),
-                GuardrailPromptConstructor(),
-            )
-        else:
-            raise NotImplementedError("Multi-asset not implemented for Claude")
+            raise NotImplementedError("Multi-asset not implemented for openai-compatible")
     else:
         logger.error(
             f"SYS-Model {chat_config['chat_model_inference_engine']} not implemented"

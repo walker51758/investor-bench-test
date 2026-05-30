@@ -23,7 +23,7 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from .embedding import OpenAIEmbedding
+from .embedding import OpenAIEmbedding, MiniMaxEmbedding
 from .utils import ensure_path
 
 
@@ -162,15 +162,20 @@ class MemoryDB:
         self.memory_config = agent_config["memory_db_config"]
         self.emb_config = emb_config
         # embedding model
-        self.emb_model = OpenAIEmbedding(emb_config=self.emb_config)
+        emb_engine = self.emb_config.get("emb_inference_engine", "openai")
+        if emb_engine == "minimax":
+            logger.info("SYS-Using MiniMaxEmbedding")
+            self.emb_model = MiniMaxEmbedding(emb_config=self.emb_config)
+        else:
+            logger.info("SYS-Using OpenAIEmbedding")
+            self.emb_model = OpenAIEmbedding(emb_config=self.emb_config)
         # init database
         self.connection_client = QdrantClient(
             url=self.memory_config["memory_db_endpoint"]
         )
         logger.trace("Connect to Qdrant established")
-        if self.connection_client.collection_exists(
-            collection_name=self.agent_config["agent_name"]
-        ):
+        existing_collections = [c.name for c in self.connection_client.get_collections().collections]
+        if self.agent_config["agent_name"] in existing_collections:
             logger.trace(
                 f"SYS-Collection {self.agent_config['agent_name']} already exists, deleting"
             )
@@ -741,21 +746,21 @@ class MemoryDB:
         # extract memories
         all_memories = self._get_record_dict(with_vector=True)
         # save
-        with open(os.path.join(path, "brain", "memories.json"), "w") as f:
+        with open(os.path.join(path, "brain", "memories.json"), "w", encoding="utf-8") as f:
             f.write(orjson.dumps(all_memories).decode())
-        with open(os.path.join(path, "brain", "agent_config.json"), "w") as f:
+        with open(os.path.join(path, "brain", "agent_config.json"), "w", encoding="utf-8") as f:
             f.write(orjson.dumps(self.agent_config).decode())
-        with open(os.path.join(path, "brain", "emb_config.json"), "w") as f:
+        with open(os.path.join(path, "brain", "emb_config.json"), "w", encoding="utf-8") as f:
             f.write(orjson.dumps(self.emb_config).decode())
 
     @classmethod
     def load_checkpoint(cls, path: str) -> "MemoryDB":
         # load data
-        with open(os.path.join(path, "brain", "memories.json"), "r") as f:
+        with open(os.path.join(path, "brain", "memories.json"), "r", encoding="utf-8") as f:
             memories = orjson.loads(f.read())
-        with open(os.path.join(path, "brain", "agent_config.json"), "r") as f:
+        with open(os.path.join(path, "brain", "agent_config.json"), "r", encoding="utf-8") as f:
             agent_config = orjson.loads(f.read())
-        with open(os.path.join(path, "brain", "emb_config.json"), "r") as f:
+        with open(os.path.join(path, "brain", "emb_config.json"), "r", encoding="utf-8") as f:
             emb_config = orjson.loads(f.read())
         # init memoryDB
         new_memory_db = cls(agent_config=agent_config, emb_config=emb_config)

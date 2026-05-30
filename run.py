@@ -10,6 +10,19 @@ import sys
 import time
 from typing import Dict
 
+# Force UTF-8 for stdout to prevent GBK encoding errors on Chinese Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+# Also try setting console to UTF-8 on Windows (non-fatal if it fails)
+if sys.platform == "win32":
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleOutputCP(65001)
+    except Exception:
+        pass
+
 import orjson
 import typer
 from dotenv import load_dotenv
@@ -23,11 +36,26 @@ from src import (
     RunMode,
     TaskType,
     ensure_path,
+    get_chat_model,
     output_metric_summary_multi,
     output_metrics_summary_single,
 )
 
 app = typer.Typer()
+
+
+def replace_safe_loguru_sink(message):
+    """Loguru sink that replaces unencodable characters instead of crashing."""
+    msg = str(message)
+    try:
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+    except UnicodeEncodeError:
+        # Fallback: encode with the source encoding (e.g. gbk) replacing unencodable chars
+        codec = sys.stdout.encoding or "utf-8"
+        safe = msg.encode(codec, errors="replace").decode(codec)
+        sys.stdout.write(safe)
+        sys.stdout.flush()
 
 
 def load_config(path: str) -> Dict:
@@ -68,14 +96,16 @@ def warmup_up_func(
         format="{time} {level} {message}",
         level="INFO",
         mode="w",
+        encoding="utf-8",
     )
     logger.add(
         sink=os.path.join(config["meta_config"]["log_save_path"], "warmup_trace.log"),
         format="{time} {level} {message}",
         level="TRACE",
         mode="w",
+        encoding="utf-8",
     )
-    logger.add(sys.stdout, level="INFO", format="{time} {level} {message}")
+    logger.add(replace_safe_loguru_sink, level="INFO", format="{time} {level} {message}")
 
     # chat request sleep
     if "chat_request_sleep" in config["chat_config"]:
@@ -200,14 +230,16 @@ def warmup_checkpoint_func(
         format="{time} {level} {message}",
         level="INFO",
         mode="a",
+        encoding="utf-8",
     )
     logger.add(
         sink=os.path.join(config["meta_config"]["log_save_path"], "warmup_trace.log"),
         format="{time} {level} {message}",
         level="TRACE",
         mode="a",
+        encoding="utf-8",
     )
-    logger.add(sys.stdout, level="INFO", format="{time} {level} {message}")
+    logger.add(replace_safe_loguru_sink, level="INFO", format="{time} {level} {message}")
 
     # chat request sleep
     if "chat_request_sleep" in config["chat_config"]:
@@ -316,14 +348,16 @@ def test_func(
         format="{time} {level} {message}",
         level="INFO",
         mode="w",
+        encoding="utf-8",
     )
     logger.add(
         sink=os.path.join(config["meta_config"]["log_save_path"], "test_trace.log"),
         format="{time} {level} {message}",
         level="TRACE",
         mode="w",
+        encoding="utf-8",
     )
-    logger.add(sys.stdout, level="INFO", format="{time} {level} {message}")
+    logger.add(replace_safe_loguru_sink, level="INFO", format="{time} {level} {message}")
 
     # chat request sleep
     if "chat_request_sleep" in config["chat_config"]:
@@ -358,6 +392,16 @@ def test_func(
     agent = FinMemAgent.load_checkpoint(
         path=os.path.join(config["meta_config"]["warmup_output_save_path"], "agent"),
         portfolio_load_for_test=True,
+    )
+
+    # Override the agent's chat_config with the current config file's settings.
+    # load_checkpoint restores chat_config from the checkpoint's state_dict.json,
+    # which may have a different model (e.g. after switching backbone models).
+    # We must re-create the chat endpoint so it uses the model from main.json.
+    agent.chat_config = config["chat_config"]
+    _, agent.chat_endpoint, _ = get_chat_model(
+        chat_config=config["chat_config"],
+        task_type=task_type,
     )
 
     # env + agent loop
@@ -446,14 +490,16 @@ def test_checkpoint_func(
         format="{time} {level} {message}",
         level="INFO",
         mode="a",
+        encoding="utf-8",
     )
     logger.add(
         sink=os.path.join(config["meta_config"]["log_save_path"], "test_trace.log"),
         format="{time} {level} {message}",
         level="TRACE",
         mode="a",
+        encoding="utf-8",
     )
-    logger.add(sys.stdout, level="INFO", format="{time} {level} {message}")
+    logger.add(replace_safe_loguru_sink, level="INFO", format="{time} {level} {message}")
 
     # load env and agent
     agent = FinMemAgent.load_checkpoint(
@@ -587,5 +633,5 @@ def eval_func(
 
 
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(override=True)
     app()

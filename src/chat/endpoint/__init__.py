@@ -9,7 +9,4 @@ from .base import (
 )
 
 from .vllm import SingleAssetVLLMStructureGeneration, MultiAssetsVLLMStructureGeneration
-from .guardrails import (
-    GPTGuardRailStructureGeneration,
-    ClaudeGuardRailStructureGeneration,
-)
+from .openai_compatible import SingleAssetOpenAICompatibleStructureGeneration

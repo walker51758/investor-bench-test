@@ -231,7 +231,7 @@ class MarketEnv:
             "symbol": self.symbols,
             "momentum_window_size": self.momentum_window,
         }
-        with open(os.path.join(path, "env_checkpoint.json"), "w") as f:
+        with open(os.path.join(path, "env_checkpoint.json"), "w", encoding="utf-8") as f:
             # json.dump(state_dict, f)
             f.write(
                 orjson.dumps(
@@ -247,7 +247,7 @@ class MarketEnv:
     @classmethod
     def load_checkpoint(cls, path: str) -> "MarketEnv":
         logger.info(f"ENV-Loading environment from {path}")
-        with open(os.path.join(path, "env_checkpoint.json"), "r") as f:
+        with open(os.path.join(path, "env_checkpoint.json"), "r", encoding="utf-8") as f:
             env_config = json.load(f)
         env = cls(
             env_data_path=env_config["env_date_path"],

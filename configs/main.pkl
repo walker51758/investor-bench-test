@@ -19,9 +19,7 @@ hidden config = new meta.MetaConfig {
     //test_end_time = "2020-09-21"
     // stock
     trading_symbols = new Listing {
-            "UVV"
-            "TSLA"
-            "JNJ"
+            "MSFT"
     }
     warmup_start_time = "2020-07-02"
     warmup_end_time = "2020-09-30"
@@ -46,11 +44,13 @@ hidden config = new meta.MetaConfig {
     top_k = 5
     look_back_window_size = 3
     momentum_window_size = 3
-    embedding_model = "text-embedding-3-large"
-    chat_model = "llama-3.1-8b-instruct"
+    embedding_model = "minimax-embo-01"
+    chat_max_new_token = 4096
+    chat_model = "minimax-m2"
     chat_vllm_endpoint = "http://0.0.0.0:8000"
+    memory_db_endpoint = "http://localhost:6333"
     chat_parameters = new Mapping {
-        ["temperature"] = 0.6
+        ["temperature"] = 1.0
     }
 }
 

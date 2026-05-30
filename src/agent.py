@@ -678,7 +678,7 @@ class FinMemAgent:
             "id_generator": self.id_generator.save_check_point(),
             "task_type": self.task_type,
         }
-        with open(os.path.join(path, "state_dict.json"), "w") as f:
+        with open(os.path.join(path, "state_dict.json"), "w", encoding="utf-8") as f:
             f.write(orjson.dumps(state_dict).decode())
         self.memory_db.save_checkpoint(os.path.join(path, "memory_db"))
 
